@@ -1,1 +1,3 @@
 test-go-sdl2
+libs/
+run.sh
