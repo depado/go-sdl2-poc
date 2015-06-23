@@ -1,6 +1,10 @@
 package main
 
 import (
+	"log"
+	"os"
+	"path/filepath"
+
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/sdl_image"
 )
@@ -46,6 +50,12 @@ func BlitCenterImage(file string, dst *sdl.Surface) error {
 }
 
 func main() {
+	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	if err != nil {
+		log.Fatal(err)
+	}
+	os.Setenv("LD_LIBRARY_PATH", filepath.Join(dir, "libs"))
+
 	sdl.Init(sdl.INIT_EVERYTHING | img.INIT_PNG)
 
 	window, err := sdl.CreateWindow("test", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
