@@ -1,9 +1,15 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/sdl_image"
 )
+
+var winTitle string = "Go-SDL2 Events"
+var winWidth, winHeight int = 800, 600
 
 func perror(err error) {
 	if err != nil {
@@ -11,60 +17,70 @@ func perror(err error) {
 	}
 }
 
-// Returns a sdl.Rect that represents the centered src surface on the dst surface
-func CalculateCenterRect(src *sdl.Surface, dst *sdl.Surface) (centerRect sdl.Rect) {
-	centerRect = src.ClipRect
-	centerRect.X = dst.ClipRect.H/2 - centerRect.H/2
-	centerRect.Y = dst.ClipRect.W/2 - centerRect.W/2
-	return
-}
-
-// Blits the src surface with its raw dimensions to the center of the dst surface
-// Note : This function is for testing purpose.
-func BlitRawCenter(src *sdl.Surface, dst *sdl.Surface) error {
-	centerRect := CalculateCenterRect(src, dst)
-	return src.Blit(nil, dst, &centerRect)
-}
-
-// Blits the src surface with dimensions of srcRect to the center of the dst surface
-// Note : This function is for testing purpose
-func BlitCenter(srcRect *sdl.Rect, src *sdl.Surface, dst *sdl.Surface) error {
-	centerRect := CalculateCenterRect(src, dst)
-	return src.Blit(srcRect, dst, &centerRect)
-}
-
-// Blits an image to the center of the dst surface
-func BlitCenterImage(file string, dst *sdl.Surface) error {
-	imgSurface, err := img.Load(file)
-	if err != nil {
-		return err
-	}
-	// I don't know what's going on here. Is the resource free at the end of the function ?
-	// Is it the intended behaviour ? I should look into it.
-	defer imgSurface.Free()
-	return BlitRawCenter(imgSurface, dst)
-}
-
 func main() {
-	sdl.Init(sdl.INIT_EVERYTHING | img.INIT_PNG)
+	var window *sdl.Window
+	var renderer *sdl.Renderer
+	var event sdl.Event
+	var running bool
+	var err error
+	var image *sdl.Surface
+	var texture *sdl.Texture
 
-	window, err := sdl.CreateWindow("test", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
-		800, 600, sdl.WINDOW_SHOWN)
-	perror(err)
+	window, err = sdl.CreateWindow(winTitle, sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
+		winWidth, winHeight, sdl.WINDOW_SHOWN)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create window: %s\n", err)
+		os.Exit(1)
+	}
 	defer window.Destroy()
 
-	// To do : Add handling for events like closing the window.
+	renderer, err = sdl.CreateRenderer(window, -1, sdl.RENDERER_ACCELERATED)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create renderer: %s\n", err)
+		os.Exit(2)
+	}
+	defer renderer.Destroy()
 
-	// To do : Understand what are renderers
-	// renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_ACCELERATED|sdl.RENDERER_PRESENTVSYNC)
-	// perror(err)
-
-	surface, err := window.GetSurface()
+	image, err = img.Load("res/sdl_img.png")
 	perror(err)
+	defer image.Free()
 
-	BlitCenterImage("res/sdl_img.png", surface)
-	window.UpdateSurface()
+	texture, err = renderer.CreateTextureFromSurface(image)
+	perror(err)
+	defer texture.Destroy()
 
-	sdl.Delay(5000)
+	src := sdl.Rect{0, 0, 512, 512}
+	dst := image.ClipRect
+
+	running = true
+	for running {
+		for event = sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
+			switch t := event.(type) {
+			case *sdl.QuitEvent:
+				running = false
+			case *sdl.MouseMotionEvent:
+				fmt.Printf("[%d ms] MouseMotion\ttype:%d\tid:%d\tx:%d\ty:%d\txrel:%d\tyrel:%d\n",
+					t.Timestamp, t.Type, t.Which, t.X, t.Y, t.XRel, t.YRel)
+			case *sdl.MouseButtonEvent:
+				fmt.Printf("[%d ms] MouseButton\ttype:%d\tid:%d\tx:%d\ty:%d\tbutton:%d\tstate:%d\n",
+					t.Timestamp, t.Type, t.Which, t.X, t.Y, t.Button, t.State)
+			case *sdl.MouseWheelEvent:
+				fmt.Printf("[%d ms] MouseWheel\ttype:%d\tid:%d\tx:%d\ty:%d\n",
+					t.Timestamp, t.Type, t.Which, t.X, t.Y)
+			case *sdl.KeyDownEvent:
+				fmt.Printf("[%d ms] Keyboard\ttype:%d\tsym:%c\tmodifiers:%d\tstate:%d\trepeat:%d\n",
+					t.Timestamp, t.Type, t.Keysym.Sym, t.Keysym.Mod, t.State, t.Repeat)
+			case *sdl.KeyUpEvent:
+				fmt.Printf("[%d ms] Keyboard\ttype:%d\tsym:%c\tmodifiers:%d\tstate:%d\trepeat:%d\n",
+					t.Timestamp, t.Type, t.Keysym.Sym, t.Keysym.Mod, t.State, t.Repeat)
+			}
+		}
+		dst.X += 1
+		dst.Y += 1
+		renderer.Clear()
+		renderer.Copy(texture, &src, &dst)
+		renderer.Present()
+		sdl.Delay(50)
+	}
 	sdl.Quit()
 }
